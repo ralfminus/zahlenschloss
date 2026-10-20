@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🔐 Zahlenschloss-Simulation: Monte-Carlo & Hacker-Challenge</title>
+  <meta name="description" content="Interaktive Zahlenschloss-Simulation: Monte-Carlo Stresstest (Top-3 vs. Top-1) und Hacker-Challenge mit 5x10 Heatmap.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="app-header">
+    <div class="brand">
+      <span class="brand-icon">🔐</span>
+      <div>
+        <h1 class="brand-title">Zahlenschloss-Lab</h1>
+      </div>
+      <span class="brand-badge">Side-Channel Heuristik v2.0</span>
+    </div>
+
+    <div class="header-controls">
+      <!-- Schloss-Typ / Zylinder-Wahlschalter (3, 4, 5 Ziffern) -->
+      <div class="digits-selector-wrap">
+        <span class="selector-label">Schloss-Typ:</span>
+        <div class="digits-toggle" role="radiogroup">
+          <button class="digits-btn" data-digits="3">3 Ziffern</button>
+          <button class="digits-btn" data-digits="4">4 Ziffern</button>
+          <button class="digits-btn active" data-digits="5">5 Ziffern</button>
+        </div>
+        <span class="info-icon" title="3 Ziffern = Koffer/Spind (1.000 Kombis), 4 Ziffern = Standard-Bügel (10.000 Kombis), 5 Ziffern = High-End Kette (100.000 Kombis).">ⓘ</span>
+      </div>
+
+      <!-- Modi Umschalter -->
+      <div class="mode-toggle" role="tablist">
+        <button id="btnModeLabor" class="mode-btn active" role="tab" aria-selected="true">
+          🔬 Labor (Monte-Carlo)
+        </button>
+        <button id="btnModeGame" class="mode-btn" role="tab" aria-selected="false">
+          🎮 Hacker-Challenge
+        </button>
+        <button id="btnModeAudit" class="mode-btn" role="tab" aria-selected="false">
+          🕵️ Real-Decoder (Praxis)
+        </button>
+      </div>
+
+      <button id="btnOpenAssumptions" class="icon-btn" title="Modell-Annahmen & physikalische Prämissen">
+        🔬 Annahmen & Physik
+      </button>
+
+      <button id="btnToggleSound" class="icon-btn" title="Sound umschalten">
+        <span id="soundIcon">🔊</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Haupt-Container -->
+  <main class="main-container">
+
+    <!-- ========================================== -->
+    <!-- ANSICHT 1: LABOR-MODUS (REINE SIMULATION)  -->
+    <!-- ========================================== -->
+    <div id="laborView" class="view-panel active">
+      
+      <!-- Obere Zeile: Steuerung & Doppel-Kurve -->
+      <div class="labor-top-grid">
+        
+        <!-- Steuerungs-Karte -->
+        <div class="card">
+          <div class="card-title">
+            <span>⚙️ Verhaltensmodell & Heuristik</span>
+          </div>
+
+          <!-- 6 Presets im 2x3 Raster -->
+          <div class="preset-selector">
+            <label class="control-label">Menschliches Verhaltensmuster</label>
+            <div class="preset-chip-grid-2x3">
+              <button class="preset-chip" data-preset="faul" title="Sehr faul: 1 Rad um ±1 verstellt (vor allem Außenräder). Minimaler Aufwand des Nutzers.">
+                <span class="preset-title">Sehr faul</span>
+                <span class="preset-sub">1 Rad (±1)</span>
+              </button>
+              <button class="preset-chip active" data-preset="standard" title="Alltäglich: 1–2 Räder um ±1 bis ±2 verstellt. Typisches Alltagsverhalten.">
+                <span class="preset-title">Alltäglich</span>
+                <span class="preset-sub">1–2 Räder (±1..2)</span>
+              </button>
+              <button class="preset-chip" data-preset="moderat" title="Moderat: 2–3 Räder verstellt um ±0 bis ±5 (Halbdrehung an ausgewählten Zylindern).">
+                <span class="preset-title">Moderat</span>
+                <span class="preset-sub">2–3 Räder (±0..5)</span>
+              </button>
+              <button class="preset-chip" data-preset="gruendlich" title="Gründlich: 3–5 Räder verstellt um ±0 bis ±3. Viele Räder bewegt, aber mit kleiner Winkelauslenkung.">
+                <span class="preset-title">Gründlich</span>
+                <span class="preset-sub">3–5 Räder (±0..3)</span>
+              </button>
+              <button class="preset-chip" data-preset="halbdrehung" title="Halbdrehung: 3–5 Räder bis zu einer halben Umdrehung (±0..5) weit weggedreht.">
+                <span class="preset-title">Halbdrehung</span>
+                <span class="preset-sub">3–5 Räder (±0..5)</span>
+              </button>
+              <button class="preset-chip" data-preset="sicher" title="Maximal sicher: Alle Räder werden pseudozufällig und unabhängig über alle Ziffern (0–9) verwirbelt.">
+                <span class="preset-title">Maximal sicher</span>
+                <span class="preset-sub">Alle 5 (0..9 Chaos)</span>
+              </button>
+            </div>
+            <div id="presetDesc" class="preset-description">
+              Alltägliche Routine: 1–2 Räder um ±1 (selten ±2) verstellt.
+            </div>
+          </div>
+
+          <!-- Slider N mit Tooltip -->
+          <div class="control-group">
+            <div class="control-label has-tooltip">
+              <span>Beobachtungen (N): <span class="info-icon" title="Anzahl der abgefangenen verstellten Schließzustände. Je höher N, desto schärfer schält sich der wahre Code heraus.">ⓘ</span></span>
+              <span id="valObservations" class="control-value">15</span>
+            </div>
+            <input type="range" id="sliderObservations" min="5" max="50" value="15" step="1">
+          </div>
+
+          <!-- Slider Noise mit Tooltip -->
+          <div class="control-group">
+            <div class="control-label has-tooltip">
+              <span>Störfaktor / Rauschen: <span class="info-icon" title="Prozentsatz unvorhersehbarer Verstellungen (z. B. Hosenabrieb, versehentliches Weitdrehen oder Fremdeingriff). 0% = Reines Labor, 40% = Hohes Chaos.">ⓘ</span></span>
+              <span id="valNoise" class="control-value">10 %</span>
+            </div>
+            <input type="range" id="sliderNoise" min="0" max="40" value="10" step="5">
+          </div>
+
+          <!-- Daumen-Kopplung -->
+          <label class="toggle-row">
+            <span class="has-tooltip"><span id="labelThumbCouplingText">Daumen-Wisch-Kopplung (Rad 4+5)</span> <span class="info-icon" title="Simuliert die motorische Eigenheit, mit dem Daumen zwei benachbarte Räder gemeinsam in einer Wischbewegung zu verdrehen.">ⓘ</span></span>
+            <div class="toggle-switch">
+              <input type="checkbox" id="checkCoupling" checked>
+              <span class="slider"></span>
+            </div>
+          </label>
+        </div>
+
+        <!-- Doppel-Kurve N über Trefferquote -->
+        <div class="card">
+          <div class="card-title">
+            <span>📈 Trefferquote über N Beobachtungen <span class="info-icon" title="Empirisch kalibrierte Kurve für N=1..50. Grün: Wahrscheinlichkeit der Eingrenzung auf den Top-3 Raum. Cyan: Soforttreffer mit genau 1 Versuch.">ⓘ</span></span>
+            <div style="display: flex; gap: 14px; font-size: 0.8rem; font-family: var(--font-mono);">
+              <span style="color: var(--accent-emerald);">● Top-3 (≤243 Raum): <strong id="curvePctTop3">96 %</strong></span>
+              <span style="color: var(--accent-cyan);">● Top-1 (1 Versuch): <strong id="curvePctTop1">45 %</strong></span>
+            </div>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="mathCurveCanvas"></canvas>
+          </div>
+          <div class="formula-desc">
+            🟢 <strong>Grün:</strong> Wahrscheinlichkeit, dass der echte Code in den Top-3 Kandidaten liegt (Eingrenzung).<br>
+            🔵 <strong>Cyan:</strong> Wahrscheinlichkeit, dass der Angreifer mit <em>genau 1 Versuch</em> (Spitzenreiter-Code) direkt ins Schwarze trifft.
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Unterer Bereich: ZWEI parallele 100-Schlösser Monte-Carlo Raster NEBENEINANDER (ULTRA-KOMPAKT) -->
+      <div class="card" style="margin-top: 24px;">
+        <div class="card-title">
+          <span>🎲 Monte-Carlo Stresstest: 100 Schlösser im Doppel-Vergleich</span>
+          <span style="font-size: 0.8rem; color: var(--accent-cyan); font-family: var(--font-mono); background: rgba(0, 242, 254, 0.1); border: 1px solid rgba(0, 242, 254, 0.25); padding: 3px 10px; border-radius: 12px;">⚡ Automatische Live-Simulation</span>
+        </div>
+
+        <!-- Zwei Raster nebeneinander als ultrakompakte Dashboard-Karten -->
+        <div class="mc-side-by-side-grid">
+          <!-- Raster 1: Top-3 Heuristik -->
+          <div class="mc-section-compact">
+            <div id="mcGridTop3" class="mc-grid mc-grid-compact"></div>
+            <div class="mc-info-side">
+              <div class="mc-header-compact">
+                <span class="mc-title-compact">1. Eingrenzung: Top-3 (<span id="labelTop3Space">≤243</span>) <span class="info-icon" title="Prüft, ob der echte Code in den Top-3 Kandidaten je Rad liegt.">ⓘ</span></span>
+                <div class="mc-kpi-badge">
+                  <span>Geknackt:</span>
+                  <strong id="mcSuccessTop3" style="color: var(--accent-emerald);">96 / 100 (96 %)</strong>
+                </div>
+              </div>
+              <p class="mc-desc-compact">Echter Code liegt sicher im Top-3 Raum je Zylinder.</p>
+            </div>
+          </div>
+
+          <!-- Raster 2: Top-1 Heuristik -->
+          <div class="mc-section-compact">
+            <div id="mcGridTop1" class="mc-grid mc-grid-compact"></div>
+            <div class="mc-info-side">
+              <div class="mc-header-compact">
+                <span class="mc-title-compact">2. Volltreffer: Genau 1 Versuch <span class="info-icon" title="Prüft, ob der Spitzenreiter-Code (Rang 1 an allen Rädern) sofort der Volltreffer ist.">ⓘ</span></span>
+                <div class="mc-kpi-badge">
+                  <span>Geknackt:</span>
+                  <strong id="mcSuccessTop1" style="color: var(--accent-cyan);">48 / 100 (48 %)</strong>
+                </div>
+              </div>
+              <p class="mc-desc-compact">Spitzenreiter öffnet das Schloss sofort auf Anhieb.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="mc-footer">
+          <div class="mc-legend">
+            <span class="legend-item"><span class="legend-dot green"></span> Geknackt / Enthalten</span>
+            <span class="legend-item"><span class="legend-dot red"></span> Fehlgeschlagen</span>
+            <span class="legend-item"><span class="legend-dot gray"></span> Bereit</span>
+          </div>
+          <span style="font-size: 0.85rem; color: var(--text-muted);">
+            💡 Zeigt den direkten Vergleich: Selbst wenn der 1. Versuch nicht sofort sitzt, ist der Code fast immer im reduzierten Raum gefangen!
+          </span>
+        </div>
+      </div>
+
+      <!-- Point 3: Benchmark-Leiste (Notwendige Beobachtungen für 90 % Trefferquote bei 3 Versuchen) -->
+      <div class="card" style="margin-top: 24px;">
+        <div class="card-title">
+          <span>📊 Notwendige Beobachtungen für 90 % Trefferquote (bei max. 3 Versuchen)</span>
+          <span class="info-icon" title="Ermittelt für alle 6 Verhaltensmodelle dynamisch, wie viele Schließzustände (N) abgefangen werden müssen, damit unter den 3 besten Heuristik-Tipps zu ≥90 % der echte Code getroffen wird.">ⓘ</span>
+        </div>
+        <p class="section-hint" style="margin-bottom: 14px;">
+          Empirische Verwundbarkeits-Hierarchie bei aktuellem Störfaktor und gewähltem Schlosstyp:
+        </p>
+        <div id="benchmarkCardsGrid" class="benchmark-cards-grid">
+          <!-- Dynamisch mit 6 Karten befüllt -->
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ============================================== -->
+    <!-- ANSICHT 2: HACKER-CHALLENGE (NEUES LAYOUT)     -->
+    <!-- ============================================== -->
+    <div id="gameView" class="view-panel">
+      
+      <!-- Briefing Card mit 4 Verhaltens-Buttons & N-Slider -->
+      <div class="game-briefing">
+        <div class="briefing-left">
+          <h3>🎯 Operation: Fahrradschloss knacken</h3>
+          <p>Wähle das Profil des Opfers (erzeugt neues Ziel) und steuere, wie viele Blicke auf das Schloss abgefangen wurden:</p>
+          
+          <!-- 6 Opfer-Verhaltens-Buttons im 2x3 Raster -->
+          <div class="victim-selector">
+            <span style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 600;">
+              Opfer-Profil (erzeugt neues Ziel):
+              <span class="info-icon" title="Wählt ein realistisches Verhaltensmuster des Schossbesitzers und generiert ein neues geheimes Schloss.">ⓘ</span>
+            </span>
+            <div class="preset-chip-grid-2x3">
+              <button class="preset-chip game-preset-btn" data-preset="faul" title="Sehr faul: Verstellt fast immer nur 1 Rad um ±1 Klick (bevorzugt Außenräder).">
+                <span class="preset-title">Sehr faul</span>
+                <span class="preset-sub">1 Rad (±1)</span>
+              </button>
+              <button class="preset-chip active game-preset-btn" data-preset="standard" title="Alltäglich: Verstellt 1 bis 2 Räder um ±1 bis ±2 Klicks.">
+                <span class="preset-title">Alltäglich</span>
+                <span class="preset-sub">1–2 Räder (±1..2)</span>
+              </button>
+              <button class="preset-chip game-preset-btn" data-preset="moderat" title="Moderat: Verstellt 2 bis 3 Räder um bis zu ±5 (Halbdrehung an Teilrädern).">
+                <span class="preset-title">Moderat</span>
+                <span class="preset-sub">2–3 Räder (±0..5)</span>
+              </button>
+              <button class="preset-chip game-preset-btn" data-preset="gruendlich" title="Gründlich: Verstellt viele Räder (3–5), aber jeweils nur um kleine Beträge (±0..3).">
+                <span class="preset-title">Gründlich</span>
+                <span class="preset-sub">3–5 Räder (±0..3)</span>
+              </button>
+              <button class="preset-chip game-preset-btn" data-preset="halbdrehung" title="Halbdrehung: Führt über 3–5 Räder eine schwungvolle Wischbewegung bis zu 180° (±0..5) aus.">
+                <span class="preset-title">Halbdrehung</span>
+                <span class="preset-sub">3–5 Räder (±0..5)</span>
+              </button>
+              <button class="preset-chip game-preset-btn" data-preset="sicher" title="Maximal sicher: Alle Räder werden völlig chaotisch und unabhängig voneinander 0–9 verwirbelt.">
+                <span class="preset-title">Maximal sicher</span>
+                <span class="preset-sub">Alle 5 (0..9 Chaos)</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="briefing-right">
+          <!-- Versuchs-Anzeige -->
+          <div class="attempts-container">
+            <span style="font-weight: 600; color: var(--text-secondary);">
+              Versuche:
+              <span class="info-icon" title="Du hast maximal 5 Versuche, um das Schloss zu knacken. Jeder Klick auf 'Öffnen testen' verbraucht einen Versuch.">ⓘ</span>
+            </span>
+            <div id="attemptsIcons" class="attempts-icons">
+              <span>🔒</span><span>🔒</span><span>🔒</span><span>🔒</span><span>🔒</span>
+            </div>
+          </div>
+
+          <!-- Kumulativer Beobachtungs-Slider (Start bei N=1) -->
+          <div class="game-slider-box">
+            <div class="control-label" style="font-size: 0.8rem;">
+              <span>
+                Abgefangene Blicke (N):
+                <span class="info-icon" title="Wie oft du das Fahrrad unbeobachtet beim Schließen beobachten konntest. Je weiter du den Regler nach rechts schiebst, desto mehr Zustände fließen in die Heatmap ein.">ⓘ</span>
+              </span>
+              <strong id="gameObsCountDisplay" style="color: var(--accent-cyan); font-family: var(--font-mono);">1</strong>
+            </div>
+            <input type="range" id="sliderGameObservations" min="1" max="30" value="1" step="1">
+          </div>
+        </div>
+      </div>
+
+      <!-- Obere Reihe: Side-by-Side (3D Schloss LINKS, Heatmap RECHTS) -->
+      <div class="challenge-main-grid">
+        
+        <!-- 3D Zahlenschloss (Links) -->
+        <section class="lock-stage-card" aria-label="3D Zahlenschloss">
+          <div class="stage-header">
+            <div class="stage-title">
+              <span id="lockStageTitle">⚙️ Physisches 5-Zylinder-Schloss</span>
+            </div>
+            <div class="secret-badge">
+              <span>Ziel-Code:</span>
+              <strong id="secretDisplay">•••••</strong>
+              <button id="btnToggleSecret" class="secret-toggle-btn">Aufdecken</button>
+            </div>
+          </div>
+
+          <div id="lockAssembly" class="lock-assembly">
+            <div class="shackle-container">
+              <div id="lockShackle" class="shackle"></div>
+            </div>
+
+            <div id="lockBody" class="lock-body">
+              <div class="wheel-column" data-wheel="0">
+                <button class="wheel-step-btn btn-up" data-wheel="0">▲</button>
+                <div class="wheel-drum" data-wheel="0">
+                  <span class="wheel-digit" id="digit-0">0</span>
+                </div>
+                <button class="wheel-step-btn btn-down" data-wheel="0">▼</button>
+                <span class="wheel-label">RAD 1</span>
+              </div>
+
+              <div class="wheel-column" data-wheel="1">
+                <button class="wheel-step-btn btn-up" data-wheel="1">▲</button>
+                <div class="wheel-drum" data-wheel="1">
+                  <span class="wheel-digit" id="digit-1">0</span>
+                </div>
+                <button class="wheel-step-btn btn-down" data-wheel="1">▼</button>
+                <span class="wheel-label">RAD 2</span>
+              </div>
+
+              <div class="wheel-column" data-wheel="2">
+                <button class="wheel-step-btn btn-up" data-wheel="2">▲</button>
+                <div class="wheel-drum" data-wheel="2">
+                  <span class="wheel-digit" id="digit-2">0</span>
+                </div>
+                <button class="wheel-step-btn btn-down" data-wheel="2">▼</button>
+                <span class="wheel-label">RAD 3</span>
+              </div>
+
+              <div class="wheel-column" data-wheel="3">
+                <button class="wheel-step-btn btn-up" data-wheel="3">▲</button>
+                <div class="wheel-drum" data-wheel="3">
+                  <span class="wheel-digit" id="digit-3">0</span>
+                </div>
+                <button class="wheel-step-btn btn-down" data-wheel="3">▼</button>
+                <span class="wheel-label">RAD 4</span>
+              </div>
+
+              <div class="wheel-column" data-wheel="4">
+                <button class="wheel-step-btn btn-up" data-wheel="4">▲</button>
+                <div class="wheel-drum" data-wheel="4">
+                  <span class="wheel-digit" id="digit-4">0</span>
+                </div>
+                <button class="wheel-step-btn btn-down" data-wheel="4">▼</button>
+                <span class="wheel-label">RAD 5</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="lock-status-bar">
+            <button id="btnTestOpen" class="primary-btn">
+              <span>🔓 Öffnen testen</span>
+            </button>
+            <div id="statusPill" class="status-pill locked">
+              <span id="statusText">Bügel verriegelt</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- 5x10 Heatmap (Rechts direkt neben dem Schloss) -->
+        <div class="card">
+          <div class="card-title">
+            <span id="heatmapTitle">🔥 5×10 Frequenz-Heatmap</span>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 0.8rem; color: var(--accent-cyan);">Klick setzt Ziffer im Schloss</span>
+              <span class="info-icon" title="Zeigt, wie oft jede Ziffer (0–9) an jedem Rad beobachtet wurde. Kräftiges Cyan = Häufige Ziffer. Ein Klick auf ein Feld setzt die Ziffer direkt ins Schloss.">ⓘ</span>
+            </div>
+          </div>
+
+          <div class="heatmap-wrap">
+            <div id="heatmapHeaderRow" class="heatmap-header-row">
+              <div class="heatmap-col-header digit-col">Ziff.</div>
+              <div class="heatmap-col-header">Rad 1</div>
+              <div class="heatmap-col-header">Rad 2</div>
+              <div class="heatmap-col-header">Rad 3</div>
+              <div class="heatmap-col-header">Rad 4</div>
+              <div class="heatmap-col-header">Rad 5</div>
+            </div>
+            <div id="heatmapGrid" class="heatmap-grid">
+              <!-- Dynamisch 10 Zeilen x 5 Spalten -->
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Top-3 Mathematische Heuristik-Empfehlungen mit Trefferquote -->
+      <div class="card recommendations-card" style="margin-top: 18px;">
+        <div class="card-title" style="margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span>💡 Mathematische Heuristik-Empfehlungen (Top 3)</span>
+            <span class="info-icon" title="Wähle zwischen zwei mathematischen Philosophien: Strategie 1 (Häufigster Peak / Zero-Drift) oder Strategie 2 (Habitualer Daumen-Offset / Inverse Deconvolution).">ⓘ</span>
+          </div>
+          <!-- Strategie-Toggle: Peak vs Habitual Offset -->
+          <div class="strategy-toggle-pills" role="radiogroup">
+            <button id="btnStratPeak" class="strat-pill active" data-strategy="peak" data-tooltip="Strategie 1: Häufigkeits-Spitze. Geht von symmetrischer Gauß-Streuung um den echten Code aus.">
+              🎯 Strategie 1: Häufigkeits-Peak
+            </button>
+            <button id="btnStratOffset" class="strat-pill" data-strategy="offset" data-tooltip="Strategie 2: Habitual Offset. Rekonstruiert den Code unter Annahme fester Daumen-Wischbewegungen (±1, ±2, 180°).">
+              🔄 Strategie 2: Habitual Offset
+            </button>
+          </div>
+        </div>
+        <div id="stratOffsetDiagnosisBanner" class="strat-banner" style="display: none;"></div>
+        <div id="recommendationsList" class="recommendations-list">
+          <!-- Dynamisch mit Empfehlung 1, 2 und 3 befüllt -->
+        </div>
+      </div>
+
+      <!-- Unterer Bereich: Abgefangene Schließzustände in ZWEI SPALTEN -->
+      <div class="card">
+        <div class="card-title">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span>🕵️ Abgefangene Schließzustände (Spionage-Log)</span>
+            <span class="info-icon" title="Chronologische Liste der abgefangenen Schloss-Zustände. Ein Klick auf eine Karte lädt die gesamte Zahlenfolge direkt ins Schloss.">ⓘ</span>
+          </div>
+          <span id="interceptedBadge" class="brand-badge">15 Zustände</span>
+        </div>
+        <p class="section-hint">
+          Klicke auf einen beliebigen Zustand, um die gesamte 5-stellige Kombination direkt in die Schlosszylinder zu laden.
+        </p>
+
+        <!-- Zweispaltige Galerie -->
+        <div id="interceptedGallery" class="intercepted-two-cols">
+          <!-- Dynamisch befüllt -->
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ============================================== -->
+    <!-- ANSICHT 3: PRAXIS-DECODER (REAL-EXAMPLE AUDIT) -->
+    <!-- ============================================== -->
+    <div id="auditView" class="view-panel">
+
+      <!-- Briefing Card -->
+      <div class="game-briefing" style="margin-bottom: 24px;">
+        <div class="briefing-left" style="flex: 1;">
+          <h3>🕵️ Forensischer Praxis-Decoder: Reales Schloss analysieren</h3>
+          <p>
+            Gib abgefangene Kombinationen deines realen Fahrrad- oder Spindschlosses zeilenweise ein. 
+            Die Bayes'sche Heuristik rekonstruiert die wahrscheinlichsten Original-Codes, diagnostiziert das Verhaltensmuster und liefert die optimale Angriffsreihenfolge zum Durchprobieren.
+          </p>
+        </div>
+      </div>
+
+      <!-- Zweispaltiges Layout -->
+      <div class="audit-grid">
+        
+        <!-- Linke Spalte: Eingabe & Demo-Profile -->
+        <div class="audit-col-left">
+          <div class="card">
+            <div class="card-title">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span>📝 Reale Schließzustände (Eingabe)</span>
+                <span class="info-icon" title="Gib pro Zeile eine am echten Schloss beobachtete Kombination ein (z. B. 48215). Leerzeilen und Trennzeichen werden automatisch bereinigt.">ⓘ</span>
+              </div>
+              <span id="auditCountBadge" class="brand-badge">0 Zustände</span>
+            </div>
+
+            <p class="section-hint" style="margin-bottom: 10px;">
+              Trage pro Zeile eine Kombination mit passender Ziffernlänge (<span id="auditDigitsLabel">5</span> Ziffern) ein:
+            </p>
+
+            <textarea id="auditTextarea" class="audit-textarea" rows="8" spellcheck="false" placeholder="Beispiel:&#10;48215&#10;48216&#10;48215&#10;38215&#10;48215"></textarea>
+
+            <!-- Schnelle Aktions-Buttons -->
+            <div class="audit-btn-bar">
+              <button id="btnAuditSampleLazy" class="chip-btn" title="Lädt 6 realistische Beobachtungen eines faulen Nutzers (1 Rad verstellt)">
+                📋 Bsp: Faul (N=6)
+              </button>
+              <button id="btnAuditSampleModerat" class="chip-btn" title="Lädt 8 Beobachtungen mit Teildrehungen (2–3 Räder)">
+                📋 Bsp: Moderat (N=8)
+              </button>
+              <button id="btnAuditClear" class="chip-btn danger" title="Eingabefeld vollständig leeren">
+                🗑️ Leeren
+              </button>
+            </div>
+
+            <div id="auditValidationMsg" class="audit-val-msg">
+              Bereit zur Analyse. Gib mindestens 2 Schließzustände ein.
+            </div>
+          </div>
+
+          <!-- Mini Frequenz-Heatmap der echten Beobachtungen -->
+          <div class="card" style="margin-top: 18px;">
+            <div class="card-title">
+              <span>🔥 Frequenz-Heatmap deiner realen Daten</span>
+              <span style="font-size: 0.8rem; color: var(--accent-cyan);">Relative Ziffernhäufigkeit</span>
+            </div>
+            <div class="heatmap-wrap">
+              <div id="auditHeatmapHeaderRow" class="heatmap-header-row"></div>
+              <div id="auditHeatmapGrid" class="heatmap-grid"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Rechte Spalte: Forensische Rekonstruktion & Angriffs-Plan -->
+        <div class="audit-col-right">
+          
+          <!-- Top 3 Rekonstruierte Original-Codes -->
+          <div class="card">
+            <div class="card-title">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span>💡 Top 3 Rekonstruierte Original-Codes</span>
+                <span class="info-icon" title="Sortiert nach Bayes'scher Verbund-Wahrscheinlichkeit. Gibt die höchste Treffer-Chance für den wahren Schlosscode an.">ⓘ</span>
+              </div>
+              <span style="font-size: 0.8rem; color: var(--text-muted); font-family: var(--font-mono);">Forensischer Rang</span>
+            </div>
+            <div id="auditRecommendationsList" class="recommendations-list">
+              <div class="audit-empty-state">Noch keine Daten vorhanden. Trage links Beobachtungen ein.</div>
+            </div>
+          </div>
+
+          <!-- Verhaltens-Diagnose -->
+          <div class="card" style="margin-top: 18px;">
+            <div class="card-title">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span>🔍 Diagnostiziertes Verhaltensmuster</span>
+                <span class="info-icon" title="Analysiert die Streuung und Invarianz je Zylinder zur Aufdeckung von Bequemlichkeits-Gewohnheiten.">ⓘ</span>
+              </div>
+            </div>
+            <div id="auditDiagnosisCard" class="audit-diagnosis-box">
+              <div class="audit-empty-state">Gib Beobachtungen ein, um das Bewegungsmuster des Besitzers zu analysieren.</div>
+            </div>
+          </div>
+
+          <!-- Inverse Deconvolution (Habitual-Offset Hypothesen) -->
+          <div id="auditOffsetSection" class="card" style="margin-top: 18px; display: none;">
+            <div class="card-title">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span>🔄 Inverse Deconvolution (Habitual-Offset Rekonstruktion)</span>
+                <span class="info-icon" title="Berechnet rekonstruierte Zielcodes für feste Daumen-Wischweiten (z. B. 2 Klicks nach unten oder 180° Halbdrehung), falls der Nutzer eine starre Schließroutine besitzt.">ⓘ</span>
+              </div>
+              <span class="brand-badge" style="background: rgba(192, 132, 252, 0.15); color: #c084fc; border-color: rgba(192, 132, 252, 0.3);">Gewohnheits-Shift</span>
+            </div>
+            <div id="auditOffsetHypothesesList" class="recommendations-list">
+              <!-- Dynamisch mit Offset-Kandidaten befüllt -->
+            </div>
+          </div>
+
+          <!-- Konkreter Angriffs-Plan (Die 10 besten Codes) -->
+          <div class="card" style="margin-top: 18px;">
+            <div class="card-title">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span>🎯 Optimaler Angriffsplan für das physische Schloss</span>
+                <span class="info-icon" title="Die 10 erfolgversprechendsten Kombinationen in exakter Prioritätsreihenfolge zum manuellen Durchprobieren.">ⓘ</span>
+              </div>
+              <span style="font-size: 0.8rem; color: var(--accent-cyan); font-family: var(--font-mono);">Top-10 Reihenfolge</span>
+            </div>
+            <div id="auditAttackList" class="audit-attack-list">
+              <div class="audit-empty-state">Wird nach Eingabe der Kombinationen berechnet.</div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  <!-- Modal: Modell-Annahmen & Physik -->
+  <div id="modalAssumptions" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-window">
+      <div class="modal-header">
+        <h3 id="modalTitle" class="modal-title">🔬 Modell-Annahmen & Physikalische Prämissen</h3>
+        <button id="btnCloseModal" class="modal-close-btn" aria-label="Schließen">&times;</button>
+      </div>
+      <div class="modal-body">
+        
+        <div class="theory-card">
+          <h4>1. 🔁 Schließzyklus & Stabilität des Schwerpunkts</h4>
+          <p>
+            Der Nutzer öffnet das Schloss mit seiner echten Kombination. Nach der Nutzung schlägt er das Schloss zu und verdreht es <strong>direkt ausgehend von der echten Kombination</strong> aus Bequemlichkeit nur minimal. Dadurch tritt <em>kein Random-Walk-Drift</em> auf: Der statistische Schwerpunkt jeder Ziffer bleibt stabil auf der echten Zahl zentriert.
+          </p>
+        </div>
+
+        <div class="theory-card">
+          <h4>2. ⭕ Ring-Topologie ($\mathbb{Z}_{10}$) & Modulo-Arithmetik</h4>
+          <p>
+            Ein Zahlenschloss ist zyklisch: Auf die Ziffer <code>9</code> folgt unmittelbar die <code>0</code>. Ein Bequemlichkeits-Schritt von <code>0</code> um -1 landet auf <code>9</code>. Die Heuristik berücksichtigt diesen Ringschluss über die zirkuläre Distanz <code>min(|a-b|, 10-|a-b|)</code>.
+          </p>
+        </div>
+
+        <div class="theory-card">
+          <h4>3. 🖐️ Motorische Daumen-Kopplung & Außenrad-Tendenz</h4>
+          <p>
+            Beim schnellen Wegdrehen mit dem Daumen werden benachbarte Zylinder (insbesondere Rad 4 und 5) häufig in einer einzigen Wischbewegung gemeinsam verdreht. Zudem verstellen Menschen aus Faulheit fast immer die äußeren Räder.
+          </p>
+        </div>
+
+        <div class="theory-card">
+          <h4>4. 📉 Informationstheorie: Top-3 Eingrenzung vs. Top-1 Treffer</h4>
+          <p>
+            Die Top-3 Heuristik reduziert den Raum von 100.000 auf maximal 243 Kombinationen (über 99,7 % Reduktion). Selbst wenn der absolute Spitzenreiter (Top-1) nicht auf Anhieb öffnet, liegt der Code fast immer im eng begrenzten 243er-Raum.
+          </p>
+        </div>
+
+        <div class="theory-card">
+          <h4>5. 🔄 Duale Heuristik: Zero-Shift (Zufall) vs. Habitual Offset (Gewohnheit)</h4>
+          <p>
+            <strong>Strategie 1 (Zero-Shift / Gauß-Streuung):</strong> Der Nutzer dreht zufällig mal ±1, ±2 Klicks oder lässt Räder ganz unberührt. Der Erwartungswert $\mathbb{E}[\text{Beobachtung}]$ ist exakt der wahre Code. Hier gewinnt die Häufigkeits-Spitze (Modus).<br>
+            <strong>Strategie 2 (Habitualer Determinismus):</strong> Bestimmte Nutzer haben eine feste motorische Routine (z. B. <em>„Ich wische beim Verlassen immer die letzten zwei Räder um 2 Klicks nach unten“</em>). Dadurch entsteht ein starrer Vektor-Offset $\vec{\Delta}$. Erkennt das System eine solche Invarianz oder Daumen-Kopplung, rekonstruiert die <em>Inverse Deconvolution</em> über Modulo-10-Rückrechnung $(z - \Delta) \pmod{10}$ den verborgenen Zielcode.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Sieges-Meldung (Kompakt mit Versuchen, Code & Next Round) -->
+  <div id="modalWin" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="winTitle">
+    <div class="modal-window modal-window-compact">
+      <div class="modal-header" style="justify-content: center; position: relative;">
+        <h3 id="winTitle" class="modal-title" style="color: var(--accent-emerald); font-size: 1.3rem;">🎉 Schloss erfolgreich geknackt!</h3>
+        <button id="btnCloseWinModal" class="modal-close-btn" aria-label="Schließen">&times;</button>
+      </div>
+      <div class="modal-body win-modal-body">
+        <div class="win-icon-burst">🔓</div>
+        <div class="win-attempts-badge" id="winAttemptsSummary">Geknackt im 1. Versuch</div>
+        <p class="win-subtext" id="winSubtext">
+          Der Bügel ist aufgesprungen! Die Heuristik hat das Verhaltensmuster des Besitzers erfolgreich dechiffriert.
+        </p>
+        <div class="win-code-box">
+          <span style="font-size: 0.85rem; color: var(--text-secondary);">Richtiger Code:</span>
+          <div id="winCodeDisplay" class="win-code-digits">0 0 0 0 0</div>
+        </div>
+        <div style="margin-top: 20px;">
+          <button id="btnNextRound" class="primary-btn" style="width: 100%; justify-content: center; padding: 12px 20px; font-size: 1rem;">
+            <span>🎯 Nächstes Schloss knacken</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast"></div>
+
+  <!-- Scripts -->
+  <script src="sound.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
